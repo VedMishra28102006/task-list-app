@@ -1,6 +1,6 @@
 1. Description
 
-A small task list or todo list web app
+A task list or todo list web app
 
 2. How to run
 
