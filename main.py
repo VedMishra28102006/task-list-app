@@ -12,7 +12,7 @@ def getTasks():
 	db = sqlite3.connect("data.db")
 	db.row_factory = sqlite3.Row
 	cursor = db.cursor()
-	cursor.execute("SELECT * FROM tasks")
+	cursor.execute("SELECT * FROM tasks ORDER BY urgent DESC, urgent_updated ASC")
 	rows = cursor.fetchall()
 	db.close()
 	tasks = [dict(row) for row in rows]
@@ -69,14 +69,40 @@ def patchTask(id):
 	cursor = db.cursor()
 	cursor.execute("UPDATE tasks SET task=? WHERE id=?", (task, id))
 	db.commit()
+	cursor.execute("SELECT urgent FROM tasks WHERE id=?", (id,))
+	row = cursor.fetchone()
 	db.close()
-	if cursor.rowcount:
+	if row:
 		return jsonify({
 			"success": 1,
 			"id": id,
-			"task": task
+			"task": task,
+			"urgent": row[0]
 		}), 200
 	else:
+		return jsonify({
+			"error": "Task not found",
+			"field": id
+		}), 404
+
+@app.route("/urgentTask/<id>", methods=["PATCH"])
+def urgentTask(id):
+	db = sqlite3.connect("data.db")
+	cursor = db.cursor()
+	cursor.execute("SELECT urgent FROM tasks WHERE id=?", (id,))
+	row = cursor.fetchone()
+	if row:
+		urgent = 1 if not row[0] else 0
+		cursor.execute("UPDATE tasks SET urgent=?, urgent_updated=CURRENT_TIMESTAMP WHERE id=?", (urgent, id))
+		db.commit()
+		db.close()
+		return jsonify({
+			"success": 1,
+			"id": id,
+			"urgent": urgent
+		}), 200
+	else:
+		db.close()
 		return jsonify({
 			"error": "Task not found",
 			"field": id
@@ -86,7 +112,9 @@ if __name__ == "__main__":
 	db = sqlite3.connect("data.db")
 	db.execute("""CREATE TABLE IF NOT EXISTS tasks (
 		id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
-		task TEXT NOT NULL
+		task TEXT NOT NULL,
+		urgent INTEGER NOT NULL DEFAULT 0,
+		urgent_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)""")
 	db.commit()
 	db.close()

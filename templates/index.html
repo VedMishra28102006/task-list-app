@@ -44,6 +44,9 @@
                 transition: all 0.3s ease;
                 max-height: 300px;
                 overflow-y: auto;
+		list-style-type: none;
+		margin: 0;
+		padding: 0;
             }
             #fixedHeader > #inputBox > h4 {
                 margin: 0;
@@ -53,7 +56,7 @@
             }
 
             #fixedHeader > #inputBox > input,
-            #taskList > p > .editBox > input {
+            #taskList > li > .editBox > input {
                 flex: 2;
                 outline: none;
                 text-align: center;
@@ -74,8 +77,8 @@
                 transition: all 0.3s ease;
             }
             #fixedHeader > #inputBox > button,
-            #taskList > p > .editBox > button,
-            #taskList > p > button {
+            #taskList > li > .editBox > button,
+            #taskList > li > button {
                 border: 0;
                 color: rgba(255, 255, 255, 1);
                 background-color: rgba(0, 102, 204, 1);
@@ -91,7 +94,7 @@
                 background-color: rgba(0, 76, 153, 1);
             }
 
-            #taskList > p {
+            #taskList > li {
                 display: flex;
 		flex-direction: row;
                 align-items: center;
@@ -100,7 +103,7 @@
                 padding: 10px;
 		margin: 0;
             }
-            #taskList > p > .editBox {
+            #taskList > li > .editBox {
                 display: flex;
                 align-items: center;
 		flex: 1;
@@ -108,7 +111,7 @@
                 transition: all 0.3s ease;
                 width: 100%;
             }
-            #taskList > p > b {
+            #taskList > li > b {
                 flex: 2;
                 color: rgba(255, 255, 255, 1);
                 font-size: 18px;
@@ -125,8 +128,8 @@
                 }
             }
 
-            #taskList > p,
-            #taskList > p > .editBox {
+            #taskList > li,
+            #taskList > li > .editBox {
                 animation: glideIn 0.5s ease forwards;
             }
 
@@ -154,7 +157,7 @@
                 }
             }
 
-            #taskList > p > .editBox > input,
+            #taskList > li > .editBox > input,
             #fixedHeader > #inputBox > input {
                 animation: neonGlow 1.5s infinite alternate;
             }
@@ -170,7 +173,7 @@
 		</div>
                 <small id="errorTaskInput" for="taskInput"><br></small>
             </div>
-            <div id="taskList"></div>
+            <ul id="taskList"></ul>
         </main>
         <script>
             var taskList = document.getElementById("taskList");
@@ -190,14 +193,18 @@
                 }
             });
 
-            var createTask = (id, val) => {
-                var task = document.createElement("p");
+            var createTask = (id, val, urgent) => {
+                var task = document.createElement("li");
                 task.id = id;
                 task.innerHTML = `
                     <button onclick="updateTask('${id}')">Edit</button>
                     <b>${val}</b>
                     <button onclick="deleteTask('${id}')">-</button>
+                    <button id="urgentButton${id}" style="
+                        background-color: ${(urgent) ? "rgb(220, 20, 60)" : "rgba(0,0,0,0.5)"}
+                    " onclick="urgentTask('${id}')">Urgent</button>
                 `;
+                task.className = (urgent) ? "urgent" : "";
                 taskList.appendChild(task);
             };
 
@@ -216,7 +223,7 @@
             var updateTask = (taskId) => {
                 var el = document.getElementById(taskId);
                 var val = "";
-                for(var i=5;i < el.innerText.length-2; i++){
+                for(var i=5;i < el.innerText.length-8; i++){
                     val += el.innerText[i];
                 }
                 el.innerHTML = `<div class="editBox">
@@ -246,6 +253,9 @@
                                 <button onclick="updateTask('${data.id}')">Edit</button>
                                 <b>${data.task}</b>
                                 <button onclick="deleteTask('${data.id}')">-</button>
+                                <button id="urgentButton${data.id}" style="
+                                    background-color: ${(data.urgent) ? "rgb(220, 20, 60)" : "rgba(0,0,0,0.5)"}
+                                " onclick="urgentTask('${data.id}')">Urgent</button>
                             `;
                         }
                     });
@@ -256,7 +266,7 @@
                 const json = JSON.parse(data);
                 if(json){
                     for(var i=0; i < json.length; i++){
-                        createTask(json[i].id, json[i].task);
+                        createTask(json[i].id, json[i].task, json[i].urgent);
                     }
                 }
             }).catch(err => alert(err));
@@ -278,12 +288,39 @@
                             `;
                         }
                     } else if(data.success && data.id && data.task){
-                        createTask(data.id, data.task);
+                        createTask(data.id, data.task, 0);
                         document.getElementById("taskInput").style.cssText = `
                             border: 2px solid rgba(0, 204, 255, 1);
                             animation: neonGlow 1.5s infinite alternate;
                         `;
 			document.getElementById("errorTaskInput").innerHTML = "<br>";
+                    }
+                });
+            };
+
+            var urgentTask = (taskId) => {
+                fetch("/urgentTask/"+taskId, {
+                    method: "PATCH"
+                }).then(response => response.json()).then(data => {
+                    if(data.error){
+                        alert(data.error);
+                    } else if(data.success){
+                        var urgentButton = document.getElementById("urgentButton"+data.id);
+                        var el = document.getElementById(`${data.id}`);
+                        el.className = (data.urgent) ? "urgent" : "";
+                        el.remove();
+                        if (data.urgent) {
+                            urgentButton.style.backgroundColor = "rgb(220, 20, 60)";
+                            var urgentTasks = document.getElementsByClassName("urgent");
+                            if (urgentTasks.length > 0) {
+                                urgentTasks[urgentTasks.length-1].after(el);
+                            } else {
+                                document.getElementById("taskList").prepend(el);
+                            }
+                        } else {
+                            urgentButton.style.backgroundColor = "rgba(0,0,0,0.5)";
+                            document.getElementById("taskList").append(el);
+                        }
                     }
                 });
             };
